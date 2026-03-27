@@ -802,7 +802,7 @@ const real_t& BilinearForm::Elem (int i, int j) const
 				if (bdr_attr_marker[bdr_attr - 1] == 0) { continue; }
 
 				auto* tr = mesh->GetInternalBdrFaceTransformations(i);
-				if (tr != nullptr)
+				if (tr != nullptr && tr->Elem2No >= 0)
 				{
 					fes->GetElementVDofs(tr->Elem1No, vdofs);
 					fes->GetElementVDofs(tr->Elem2No, vdofs2);

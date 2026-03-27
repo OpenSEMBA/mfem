@@ -262,9 +262,98 @@ void ParBilinearForm::AssembleSharedFaces(int skip_zeros)
    }
 }
 
+void ParBilinearForm::AssembleSharedInternalBoundaryFaces(int skip_zeros)
+{
+   ParMesh *pmesh = pfes->GetParMesh();
+   Array<int> vdofs1, vdofs2, vdofs_all;
+   DenseMatrix elemmat;
+
+   // Build the boundary attribute marker (same logic as BilinearForm::Assemble)
+   Array<int> bdr_attr_marker(pmesh->bdr_attributes.Size() ?
+                              pmesh->bdr_attributes.Max() : 0);
+   bdr_attr_marker = 0;
+   for (int k = 0; k < internal_boundary_face_integs.Size(); k++)
+   {
+      if (internal_boundary_face_integs_marker[k] == NULL)
+      {
+         bdr_attr_marker = 1;
+         break;
+      }
+      auto& bdr_marker = *internal_boundary_face_integs_marker[k];
+      MFEM_ASSERT(bdr_marker.Size() == bdr_attr_marker.Size(),
+                  "invalid boundary marker for internal boundary face "
+                  "integrator #" << k << ", counting from zero");
+      for (int i = 0; i < bdr_attr_marker.Size(); i++)
+      {
+         bdr_attr_marker[i] |= bdr_marker[i];
+      }
+   }
+
+   // Loop over boundary elements looking for shared internal boundary faces:
+   // these are faces where Elem2Inf >= 0 (FaceIsTrueInterior) but Elem2No < 0
+   // (the second element lives on a remote MPI rank).
+   for (int be = 0; be < pmesh->GetNBE(); be++)
+   {
+      const int bdr_attr = pmesh->GetBdrAttribute(be);
+      if (bdr_attr_marker[bdr_attr - 1] == 0) { continue; }
+
+      const int fn = pmesh->GetBdrElementFaceIndex(be);
+      int e1, e2, inf1, inf2;
+      pmesh->GetFaceElements(fn, &e1, &e2);
+      pmesh->GetFaceInfos(fn, &inf1, &inf2);
+
+      // Only process shared internal boundary faces: Elem2Inf >= 0 but Elem2No < 0
+      if (inf2 < 0 || e2 >= 0) { continue; }
+
+      // GetSharedFaceTransformationsByLocalIndex sets Elem2No = NE + ghost_idx
+      FaceElementTransformations *T =
+         pmesh->GetSharedFaceTransformationsByLocalIndex(fn, true);
+
+      const int Elem2NbrNo = T->Elem2No - pmesh->GetNE();
+      pfes->GetElementVDofs(T->Elem1No, vdofs1);
+      pfes->GetFaceNbrElementVDofs(Elem2NbrNo, vdofs2);
+
+      // Offset ghost vdofs by height (consistent with AssembleSharedFaces)
+      for (int j = 0; j < vdofs2.Size(); j++)
+      {
+         if (vdofs2[j] >= 0) { vdofs2[j] += height; }
+         else                 { vdofs2[j] -= height; }
+      }
+      vdofs1.Copy(vdofs_all);
+      vdofs_all.Append(vdofs2);
+
+      // Set boundary element metadata on the transformation
+      T->Attribute     = bdr_attr;
+      T->ElementNo     = be;
+      T->ElementType   = ElementTransformation::BDR_FACE;
+
+      const auto *fe1 = pfes->GetFE(T->Elem1No);
+      const auto *fe2 = pfes->GetFaceNbrFE(Elem2NbrNo);
+
+      for (int k = 0; k < internal_boundary_face_integs.Size(); k++)
+      {
+         if (internal_boundary_face_integs_marker[k] &&
+             (*internal_boundary_face_integs_marker[k])[bdr_attr - 1] == 0)
+         {
+            continue;
+         }
+         internal_boundary_face_integs[k]->AssembleFaceMatrix(
+            *fe1, *fe2, *T, elemmat);
+         if (keep_nbr_block)
+         {
+            mat->AddSubMatrix(vdofs_all, vdofs_all, elemmat, skip_zeros);
+         }
+         else
+         {
+            mat->AddSubMatrix(vdofs1, vdofs_all, elemmat, skip_zeros);
+         }
+      }
+   }
+}
+
 void ParBilinearForm::Assemble(int skip_zeros)
 {
-   if (interior_face_integs.Size())
+   if (interior_face_integs.Size() || internal_boundary_face_integs.Size())
    {
       pfes->ExchangeFaceNbrData();
       if (!ext && mat == NULL)
@@ -278,6 +367,11 @@ void ParBilinearForm::Assemble(int skip_zeros)
    if (!ext && interior_face_integs.Size() > 0)
    {
       AssembleSharedFaces(skip_zeros);
+   }
+
+   if (!ext && internal_boundary_face_integs.Size() > 0)
+   {
+      AssembleSharedInternalBoundaryFaces(skip_zeros);
    }
 }
 

@@ -42,6 +42,7 @@ protected:
    void pAllocMat();
 
    void AssembleSharedFaces(int skip_zeros = 1);
+   void AssembleSharedInternalBoundaryFaces(int skip_zeros = 1);
 
 private:
    /// Copy construction is not supported; body is undefined.
