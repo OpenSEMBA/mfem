@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2024, Lawrence Livermore National Security, LLC. Produced
+# Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
 # at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 # LICENSE and NOTICE for details. LLNL-CODE-806117.
 #
@@ -38,7 +38,7 @@ if (MFEM_USE_GSLIB)
 
   add_mfem_miniapp(findpts
     MAIN findpts.cpp
-    LIBRARIES mfem mfem-common)
+    LIBRARIES mfem-common)
 
   add_mfem_miniapp(field-interp
     MAIN field-interp.cpp
@@ -63,8 +63,12 @@ if (MFEM_USE_GSLIB)
       MAIN pfindpts.cpp
       LIBRARIES mfem)
 
+  add_mfem_miniapp(particles_redist
+    MAIN particles_redist.cpp
+    LIBRARIES mfem-common)
+
     if (MFEM_ENABLE_TESTING)
-      foreach (test "schwarz_ex1p" "pfindpts")
+      foreach (test "schwarz_ex1p" "pfindpts" "particles_redist")
         add_test(NAME ${test}_np${MFEM_MPI_NP}
           COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${MFEM_MPI_NP}
           ${MPIEXEC_PREFLAGS}
