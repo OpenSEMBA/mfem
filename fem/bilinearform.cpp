@@ -283,6 +283,22 @@ void BilinearForm::Finalize (int skip_zeros)
 		boundary_face_integs_marker.Append(&bdr_marker);
 	}
 
+	void BilinearForm::AddInternalBoundaryFaceIntegrator(BilinearFormIntegrator
+		* bfi)
+	{
+		internal_boundary_face_integs.Append(bfi);
+		// nullptr -> all attributes are active
+		internal_boundary_face_integs_marker.Append(nullptr);
+	}
+
+	void BilinearForm::AddInternalBoundaryFaceIntegrator(BilinearFormIntegrator
+		* bfi,
+		Array<int>& internal_bdr_attr_marker)
+	{
+		internal_boundary_face_integs.Append(bfi);
+		internal_boundary_face_integs_marker.Append(&internal_bdr_attr_marker);
+	}
+
 void BilinearForm::ComputeElementMatrix(int i, DenseMatrix &elmat) const
 {
    if (element_matrices)
@@ -1422,6 +1438,8 @@ BilinearForm::~BilinearForm()
       { delete interior_face_integs[k]; }
       for (k=0; k < boundary_face_integs.Size(); k++)
       { delete boundary_face_integs[k]; }
+      for (k=0; k < internal_boundary_face_integs.Size(); k++)
+      { delete internal_boundary_face_integs[k]; }
    }
 }
 

@@ -30,6 +30,31 @@ if (HYPRE_FOUND OR TARGET HYPRE)
     find_package(rocsolver REQUIRED)
   endif()
   if (HYPRE_LIBRARIES AND HYPRE_INCLUDE_DIRS AND HYPRE_VERSION)
+    # Cached HYPRE_LIBRARIES may predate Umpire sidecars; append if present.
+    if (HYPRE_LIBRARY)
+      get_filename_component(_mfem_hypre_libdir "${HYPRE_LIBRARY}" DIRECTORY)
+    elseif (HYPRE_DIR)
+      set(_mfem_hypre_libdir "${HYPRE_DIR}/lib")
+    endif()
+    if (_mfem_hypre_libdir)
+      set(_mfem_hypre_umpire_extra "")
+      foreach(_mfem_ump_dep umpire camp fmt)
+        set(_mfem_ump_path "${_mfem_hypre_libdir}/lib${_mfem_ump_dep}.a")
+        if (EXISTS "${_mfem_ump_path}")
+          list(FIND HYPRE_LIBRARIES "${_mfem_ump_path}" _mfem_ump_idx)
+          if (_mfem_ump_idx EQUAL -1)
+            list(APPEND _mfem_hypre_umpire_extra "${_mfem_ump_path}")
+          endif()
+        endif()
+      endforeach()
+      if (_mfem_hypre_umpire_extra)
+        list(APPEND HYPRE_LIBRARIES ${_mfem_hypre_umpire_extra})
+        set(HYPRE_LIBRARIES ${HYPRE_LIBRARIES} CACHE STRING
+            "HYPRE libraries + dependencies." FORCE)
+        message(STATUS
+            "HYPRE Umpire deps added to HYPRE_LIBRARIES: ${_mfem_hypre_umpire_extra}")
+      endif()
+    endif()
     find_package_handle_standard_args(HYPRE
       REQUIRED_VARS HYPRE_LIBRARIES HYPRE_INCLUDE_DIRS HYPRE_VERSION
     )
@@ -173,6 +198,37 @@ if (HYPRE_FOUND AND (NOT HYPRE_VERSION))
   endif()
 endif()
 
+# HYPRE built with Umpire (common for HYPRE 3 + CUDA) needs libumpire at
+# final link time even when MFEM_USE_UMPIRE=OFF. Locate sidecars next to HYPRE.
+macro(mfem_hypre_append_umpire_deps)
+  if (HYPRE_LIBRARY)
+    get_filename_component(_mfem_hypre_libdir "${HYPRE_LIBRARY}" DIRECTORY)
+  elseif (HYPRE_DIR)
+    set(_mfem_hypre_libdir "${HYPRE_DIR}/lib")
+  else()
+    set(_mfem_hypre_libdir "")
+  endif()
+  if (_mfem_hypre_libdir)
+    set(_mfem_hypre_umpire_extra "")
+    foreach(_mfem_ump_dep umpire camp fmt)
+      set(_mfem_ump_path "${_mfem_hypre_libdir}/lib${_mfem_ump_dep}.a")
+      if (EXISTS "${_mfem_ump_path}")
+        list(FIND HYPRE_LIBRARIES "${_mfem_ump_path}" _mfem_ump_idx)
+        if (_mfem_ump_idx EQUAL -1)
+          list(APPEND _mfem_hypre_umpire_extra "${_mfem_ump_path}")
+        endif()
+      endif()
+    endforeach()
+    if (_mfem_hypre_umpire_extra)
+      list(APPEND HYPRE_LIBRARIES ${_mfem_hypre_umpire_extra})
+      set(HYPRE_LIBRARIES ${HYPRE_LIBRARIES} CACHE STRING
+          "HYPRE libraries + dependencies." FORCE)
+      message(STATUS
+          "HYPRE Umpire deps added to HYPRE_LIBRARIES: ${_mfem_hypre_umpire_extra}")
+    endif()
+  endif()
+endmacro()
+
 if (HYPRE_FOUND AND HYPRE_USING_CUDA)
   find_package(CUDAToolkit REQUIRED)
   # Initialize CUSPARSE_LIBRARIES, CURAND_LIBRARIES, and CUBLAS_LIBRARIES:
@@ -195,6 +251,10 @@ if (HYPRE_FOUND AND HYPRE_USING_HIP)
   set(HYPRE_LIBRARIES ${HYPRE_LIBRARIES} CACHE STRING
       "HYPRE libraries + dependencies." FORCE)
   message(STATUS "Updated HYPRE_LIBRARIES: ${HYPRE_LIBRARIES}")
+endif()
+
+if (HYPRE_FOUND)
+  mfem_hypre_append_umpire_deps()
 endif()
 
 find_package_handle_standard_args(HYPRE

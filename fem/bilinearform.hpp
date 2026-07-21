@@ -120,6 +120,10 @@ protected:
    Array<BilinearFormIntegrator*> boundary_face_integs;
    Array<Array<int>*> boundary_face_integs_marker; ///< Entries are not owned.
 
+   /// Set of internal boundary face integrators to be applied.
+   Array<BilinearFormIntegrator*> internal_boundary_face_integs;
+   Array<Array<int>*> internal_boundary_face_integs_marker; ///< Entries not owned.
+
    mutable DenseMatrix elemmat;
    mutable Array<int>  vdofs;
 
