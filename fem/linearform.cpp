@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
+// Copyright (c) 2010-2026, Lawrence Livermore National Security, LLC. Produced
 // at the Lawrence Livermore National Laboratory. All Rights reserved. See files
 // LICENSE and NOTICE for details. LLNL-CODE-806117.
 //
@@ -317,7 +317,8 @@ void LinearForm::Assemble()
          tr = mesh->GetBdrFaceTransformations(i);
          if (tr != NULL)
          {
-            fes -> GetElementVDofs (tr -> Elem1No, vdofs);
+            mfem::DofTransformation doftrans;
+            fes -> GetElementVDofs (tr -> Elem1No, vdofs, doftrans);
             for (int k = 0; k < boundary_face_integs.Size(); k++)
             {
                if (boundary_face_integs_marker[k] &&
@@ -327,6 +328,7 @@ void LinearForm::Assemble()
                boundary_face_integs[k]->
                AssembleRHSElementVect(*fes->GetFE(tr->Elem1No),
                                       *tr, elemvect);
+               doftrans.TransformDual(elemvect);
                AddElementVector (vdofs, elemvect);
             }
          }
